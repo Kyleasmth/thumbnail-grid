@@ -1,41 +1,80 @@
-import React, { useState, Dispatch, SetStateAction } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Box from "@mui/material/Box";
 import { Link } from "react-router-dom";
 import InfiniteScroll from "./InfiniteScroll";
-import { Image } from "./App";
+import UnsplashApi from "./UnspashApi";
 import Select from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
 import InputLabel from "@mui/material/InputLabel";
 import FormControl from "@mui/material/FormControl";
-interface HomeProps {
-  handleSearch: (inputValue: string) => void;
-  loading: boolean;
-  handleLoadMore: () => void;
-  colorFilter: string;
-  setColorFilter: Dispatch<SetStateAction<string>>;
-  orientationFilter: string;
-  setOrientationFilter: Dispatch<SetStateAction<string>>;
-  searchTerm: string;
-  inputValue: string;
-  setInputValue: Dispatch<SetStateAction<string>>;
-  images: Image[];
+
+export interface Image {
+  id: string;
+  urls: {
+    small: string;
+  };
 }
 
-const Home: React.FC<HomeProps> = ({
-  handleSearch,
-  loading,
-  handleLoadMore,
-  images,
-  colorFilter,
-  setColorFilter,
-  setOrientationFilter,
-  orientationFilter,
-  searchTerm,
-  inputValue,
-  setInputValue,
-}) => {
+const Home: React.FC = () => {
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [colorFilter, setColorFilter] = useState<string>("");
+  const [orientationFilter, setOrientationFilter] = useState<string>("");
+  const [images, setImages] = useState<Image[]>([]);
+  const [page, setPage] = useState<number>(1);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [inputValue, setInputValue] = useState<string>("");
+  const [error, setError] = useState<boolean>(false);
+
+  const handleLoadMore = () => {
+    if (loading || !searchTerm || error) return;
+    setPage((prevPage) => prevPage + 1);
+  };
+
+  const fetchImages = useCallback(async () => {
+    if (error) return;
+
+    setLoading(true);
+    try {
+      const params: any = {
+        query: searchTerm,
+        page,
+      };
+
+      if (colorFilter) {
+        params.color = colorFilter;
+      }
+
+      if (orientationFilter) {
+        params.orientation = orientationFilter;
+      }
+
+      const response = await UnsplashApi.get("/search/photos", {
+        params,
+      });
+      setImages((prevImages) => [...prevImages, ...response.data.results]);
+      setError(false);
+    } catch (error) {
+      console.error("Error fetching images:", error);
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [searchTerm, page, colorFilter, orientationFilter, error]);
+
+  useEffect(() => {
+    if (!searchTerm || error) return;
+    fetchImages();
+  }, [searchTerm, page, fetchImages, error]);
+
+  const handleSearch = (inputValue: string) => {
+    setSearchTerm(inputValue);
+    setImages([]);
+    setPage(1);
+    setError(false);
+  };
+
   return (
     <>
       <TextField
